@@ -17,6 +17,7 @@ local defaults = {
 }
 
 local config = vim.deepcopy(defaults)
+local root_markers = { ".git", "CMakeLists.txt", "compile_commands.json" }
 
 local function shell_quote(value)
 	return vim.fn.shellescape(value)
@@ -39,10 +40,27 @@ end
 
 local function project_root()
 	local cwd = vim.loop.cwd()
-	local ok, root = pcall(vim.fs.root, 0, { ".git", "CMakeLists.txt", "compile_commands.json" })
+	local ok, root = pcall(vim.fs.root, 0, root_markers)
 	if ok and root then
 		return root
 	end
+
+	local current_file = vim.api.nvim_buf_get_name(0)
+	local search_dir = current_file ~= "" and vim.fn.fnamemodify(current_file, ":p:h") or cwd
+	while search_dir and search_dir ~= "" do
+		for _, marker in ipairs(root_markers) do
+			if vim.loop.fs_stat(search_dir .. "/" .. marker) then
+				return search_dir
+			end
+		end
+
+		local parent = vim.fn.fnamemodify(search_dir, ":h")
+		if parent == search_dir then
+			break
+		end
+		search_dir = parent
+	end
+
 	return cwd
 end
 
@@ -80,7 +98,7 @@ end
 local function dap_variables()
 	local current_file = normalize_path(vim.api.nvim_buf_get_name(0)) or ""
 	return {
-		workspaceFolder = project_root(),
+		workspaceFolder = config.working_directory or project_root(),
 		file = current_file,
 		fileDirname = current_file ~= "" and vim.fn.fnamemodify(current_file, ":h") or "",
 		fileBasename = current_file ~= "" and vim.fn.fnamemodify(current_file, ":t") or "",

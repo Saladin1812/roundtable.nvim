@@ -78,3 +78,11 @@ require("roundtable").setup({
   dap_configuration_name = "Launch app",
 })
 ```
+
+## Tests
+
+Run the headless smoke tests:
+
+```sh
+nvim -n --headless --clean -u NONE -l tests/smoke.lua
+```
