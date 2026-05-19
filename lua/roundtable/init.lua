@@ -12,6 +12,8 @@ local defaults = {
 	include_breakpoints = true,
 	use_dap_config = true,
 	dap_configuration_name = nil,
+	use_profile = true,
+	profile_name = "nvim",
 }
 
 local config = vim.deepcopy(defaults)
@@ -94,7 +96,7 @@ local function expand_dap_string(value)
 
 	local variables = dap_variables()
 	return (value:gsub("%${([%w_]+)}", function(name)
-		return variables[name] or "${" .. name .. "}"
+		return variables[name] or ("${" .. name .. "}")
 	end))
 end
 
@@ -201,29 +203,52 @@ local function write_config(launch_context)
 	local config_path = temp_dir .. "/" .. config.config_name
 	local breakpoints = collect_breakpoints()
 
-	local lines = {
-		"[session]",
-		'mode = "dap_launch"',
-		'startup_focus = "memory"',
-		"",
-		"[dap_launch]",
-		"program = " .. toml_string(launch_context.program),
-		"arguments = " .. toml_array(launch_context.args),
-		"working_directory = " .. toml_string(launch_context.working_directory),
-		"stop_on_entry = " .. tostring(launch_context.stop_on_entry),
-		"continue_once = " .. tostring(config.continue_once),
-		"",
-		"[watches]",
-		"entries = " .. toml_array(config.watches),
-		"",
-		"[breakpoints]",
-		"entries = " .. toml_array(breakpoints),
-		"",
-		"[codelldb.auto_detect]",
-		"enabled = true",
-		"candidate_roots = []",
-		"",
-	}
+	local lines
+	if config.use_profile then
+		lines = {
+			"[session]",
+			"profile = " .. toml_string(config.profile_name),
+			'startup_focus = "memory"',
+			"",
+			"[profiles." .. config.profile_name .. "]",
+			"program = " .. toml_string(launch_context.program),
+			"arguments = " .. toml_array(launch_context.args),
+			"working_directory = " .. toml_string(launch_context.working_directory),
+			"stop_on_entry = " .. tostring(launch_context.stop_on_entry),
+			"continue_once = " .. tostring(config.continue_once),
+			"watches = " .. toml_array(config.watches),
+			"breakpoints = " .. toml_array(breakpoints),
+			"",
+			"[codelldb.auto_detect]",
+			"enabled = true",
+			"candidate_roots = []",
+			"",
+		}
+	else
+		lines = {
+			"[session]",
+			'mode = "dap_launch"',
+			'startup_focus = "memory"',
+			"",
+			"[dap_launch]",
+			"program = " .. toml_string(launch_context.program),
+			"arguments = " .. toml_array(launch_context.args),
+			"working_directory = " .. toml_string(launch_context.working_directory),
+			"stop_on_entry = " .. tostring(launch_context.stop_on_entry),
+			"continue_once = " .. tostring(config.continue_once),
+			"",
+			"[watches]",
+			"entries = " .. toml_array(config.watches),
+			"",
+			"[breakpoints]",
+			"entries = " .. toml_array(breakpoints),
+			"",
+			"[codelldb.auto_detect]",
+			"enabled = true",
+			"candidate_roots = []",
+			"",
+		}
+	end
 
 	vim.fn.writefile(lines, config_path)
 	return config_path

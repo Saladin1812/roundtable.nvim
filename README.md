@@ -18,6 +18,8 @@ require("roundtable").setup({
   terminal = "split",
   watches = {},
   use_dap_config = true,
+  use_profile = true,
+  profile_name = "nvim",
 })
 ```
 
@@ -38,6 +40,20 @@ Generate and inspect TOML without launching Roundtable:
 ```
 
 If `nvim-dap` is installed, buffer breakpoints are copied into the generated Roundtable config.
+
+By default the generated TOML uses a Roundtable launch profile:
+
+```toml
+[session]
+profile = "nvim"
+
+[profiles.nvim]
+program = "./build/my_program"
+watches = []
+breakpoints = []
+```
+
+Set `use_profile = false` if you want direct `[dap_launch]`, `[watches]`, and `[breakpoints]` sections instead.
 
 When called without an explicit program, the plugin first tries the current filetype's `nvim-dap` launch configuration:
 
