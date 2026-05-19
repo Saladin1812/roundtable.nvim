@@ -17,6 +17,7 @@ require("roundtable").setup({
   binary = "roundtable",
   terminal = "split",
   watches = {},
+  use_dap_config = true,
 })
 ```
 
@@ -31,3 +32,27 @@ Launch with an explicit program:
 Or call `:RoundtableLaunch` with no argument and enter the program path when prompted.
 
 If `nvim-dap` is installed, buffer breakpoints are copied into the generated Roundtable config.
+
+When called without an explicit program, the plugin first tries the current filetype's `nvim-dap` launch configuration:
+
+- `program`
+- `args`
+- `cwd`
+- `stopOnEntry`
+
+Common `nvim-dap` variables are expanded before writing TOML:
+
+- `${workspaceFolder}`
+- `${file}`
+- `${fileDirname}`
+- `${fileBasename}`
+- `${fileBasenameNoExtension}`
+- `${fileExtname}`
+
+You can select a specific DAP config name:
+
+```lua
+require("roundtable").setup({
+  dap_configuration_name = "Launch app",
+})
+```

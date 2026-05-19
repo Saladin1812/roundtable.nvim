@@ -10,6 +10,8 @@ local defaults = {
   stop_on_entry = true,
   continue_once = false,
   include_breakpoints = true,
+  use_dap_config = true,
+  dap_configuration_name = nil,
 }
 
 local config = vim.deepcopy(defaults)
@@ -49,6 +51,121 @@ local function normalize_path(path)
   return vim.fn.fnamemodify(path, ":p")
 end
 
+local function evaluate_value(value)
+  if type(value) == "function" then
+    local ok, result = pcall(value)
+    if ok then
+      return result
+    end
+    vim.notify("Roundtable ignored failing nvim-dap function value: " .. tostring(result), vim.log.levels.WARN)
+    return nil
+  end
+
+  return value
+end
+
+local function normalize_args(args)
+  args = evaluate_value(args)
+  if type(args) == "table" then
+    return args
+  end
+  if type(args) == "string" and args ~= "" then
+    return { args }
+  end
+  return {}
+end
+
+local function dap_variables()
+  local current_file = normalize_path(vim.api.nvim_buf_get_name(0)) or ""
+  return {
+    workspaceFolder = project_root(),
+    file = current_file,
+    fileDirname = current_file ~= "" and vim.fn.fnamemodify(current_file, ":h") or "",
+    fileBasename = current_file ~= "" and vim.fn.fnamemodify(current_file, ":t") or "",
+    fileBasenameNoExtension = current_file ~= "" and vim.fn.fnamemodify(current_file, ":t:r") or "",
+    fileExtname = current_file ~= "" and vim.fn.fnamemodify(current_file, ":e") or "",
+  }
+end
+
+local function expand_dap_string(value)
+  if type(value) ~= "string" then
+    return value
+  end
+
+  local variables = dap_variables()
+  return (value:gsub("%${([%w_]+)}", function(name)
+    return variables[name] or "${" .. name .. "}"
+  end))
+end
+
+local function expand_dap_value(value)
+  if type(value) == "table" then
+    local expanded = {}
+    for index, item in ipairs(value) do
+      expanded[index] = expand_dap_value(item)
+    end
+    return expanded
+  end
+
+  return expand_dap_string(value)
+end
+
+local function current_dap_configuration()
+  if not config.use_dap_config then
+    return nil
+  end
+
+  local ok, dap = pcall(require, "dap")
+  if not ok or type(dap.configurations) ~= "table" then
+    return nil
+  end
+
+  local filetype = vim.bo.filetype
+  local configurations = dap.configurations[filetype]
+  if type(configurations) ~= "table" then
+    return nil
+  end
+
+  for _, candidate in ipairs(configurations) do
+    if type(candidate) == "table" and candidate.request == "launch" and candidate.program ~= nil then
+      if config.dap_configuration_name == nil or candidate.name == config.dap_configuration_name then
+        return candidate
+      end
+    end
+  end
+
+  return nil
+end
+
+local function build_launch_context(program)
+  local dap_configuration = nil
+  if not program or program == "" then
+    dap_configuration = current_dap_configuration()
+    if dap_configuration then
+      program = expand_dap_value(evaluate_value(dap_configuration.program))
+    end
+  end
+
+  local cwd = expand_dap_value(config.working_directory or project_root())
+  local args = expand_dap_value(config.args)
+  local stop_on_entry = config.stop_on_entry
+
+  if dap_configuration then
+    cwd = expand_dap_value(evaluate_value(dap_configuration.cwd)) or cwd
+    args = expand_dap_value(normalize_args(dap_configuration.args))
+    if type(dap_configuration.stopOnEntry) == "boolean" then
+      stop_on_entry = dap_configuration.stopOnEntry
+    end
+  end
+
+  return {
+    program = program,
+    working_directory = cwd,
+    args = normalize_args(args),
+    stop_on_entry = stop_on_entry,
+  }
+end
+
 local function collect_breakpoints()
   if not config.include_breakpoints then
     return {}
@@ -77,8 +194,7 @@ local function collect_breakpoints()
   return entries
 end
 
-local function write_config(program)
-  local root = project_root()
+local function write_config(launch_context)
   local temp_dir = vim.fn.stdpath("cache") .. "/roundtable"
   vim.fn.mkdir(temp_dir, "p")
 
@@ -91,10 +207,10 @@ local function write_config(program)
     'startup_focus = "memory"',
     "",
     "[dap_launch]",
-    'program = ' .. toml_string(program),
-    "arguments = " .. toml_array(config.args),
-    "working_directory = " .. toml_string(root),
-    "stop_on_entry = " .. tostring(config.stop_on_entry),
+    'program = ' .. toml_string(launch_context.program),
+    "arguments = " .. toml_array(launch_context.args),
+    "working_directory = " .. toml_string(launch_context.working_directory),
+    "stop_on_entry = " .. tostring(launch_context.stop_on_entry),
     "continue_once = " .. tostring(config.continue_once),
     "",
     "[watches]",
@@ -138,8 +254,12 @@ function M.launch(program)
     program = program()
   end
 
+  local launch_context = build_launch_context(program)
+  program = launch_context.program
+
   if not program or program == "" then
     program = vim.fn.input("Roundtable program: ", "", "file")
+    launch_context.program = program
   end
 
   if not program or program == "" then
@@ -147,8 +267,13 @@ function M.launch(program)
     return
   end
 
-  program = normalize_path(program)
-  local generated_config = write_config(program)
+  launch_context.program = normalize_path(program)
+  if not launch_context.program then
+    vim.notify("Roundtable launch cancelled: invalid program path", vim.log.levels.WARN)
+    return
+  end
+
+  local generated_config = write_config(launch_context)
   local command = shell_quote(config.binary) .. " --config " .. shell_quote(generated_config)
   open_terminal(command)
 end
