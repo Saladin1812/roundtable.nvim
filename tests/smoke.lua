@@ -26,8 +26,17 @@ local function prepare_project(name)
 	return project
 end
 
+local function current_buffer_breakpoints()
+	return {
+		{ line = 7 },
+		{ line = 9, enabled = false },
+		{ line = 11, enabled = true },
+	}
+end
+
 local function install_fake_dap()
 	package.loaded["dap"] = nil
+	package.loaded["dap.breakpoints"] = nil
 	package.preload["dap"] = function()
 		return {
 			configurations = {
@@ -42,6 +51,16 @@ local function install_fake_dap()
 					},
 				},
 			},
+		}
+	end
+	package.preload["dap.breakpoints"] = function()
+		return {
+			get = function(bufnr)
+				if bufnr == vim.api.nvim_get_current_buf() then
+					return current_buffer_breakpoints()
+				end
+				return {}
+			end,
 		}
 	end
 end
@@ -69,6 +88,7 @@ local function test_profile_generation()
 	assert_contains(toml, 'working_directory = "' .. project .. '"')
 	assert_contains(toml, "stop_on_entry = false")
 	assert_contains(toml, 'watches = ["argc"]')
+	assert_contains(toml, 'breakpoints = ["' .. project .. '/src/main.cpp:7", "' .. project .. '/src/main.cpp:11"]')
 end
 
 local function test_direct_generation()
@@ -90,6 +110,7 @@ local function test_direct_generation()
 	assert_contains(toml, "[dap_launch]")
 	assert_contains(toml, 'program = "' .. project .. '/build/app"')
 	assert_contains(toml, 'entries = ["argc"]')
+	assert_contains(toml, 'entries = ["' .. project .. '/src/main.cpp:7", "' .. project .. '/src/main.cpp:11"]')
 end
 
 test_profile_generation()

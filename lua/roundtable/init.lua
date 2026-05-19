@@ -203,7 +203,12 @@ local function collect_breakpoints()
 			local buffer_breakpoints = dap_breakpoints.get(bufnr)
 			if type(buffer_breakpoints) == "table" then
 				for _, breakpoint in ipairs(buffer_breakpoints) do
-					if type(breakpoint) == "table" and type(breakpoint.line) == "number" and breakpoint.line > 0 then
+					if
+						type(breakpoint) == "table"
+						and breakpoint.enabled ~= false
+						and type(breakpoint.line) == "number"
+						and breakpoint.line > 0
+					then
 						entries[#entries + 1] = source_path .. ":" .. tostring(breakpoint.line)
 					end
 				end
