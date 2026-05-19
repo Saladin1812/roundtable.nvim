@@ -219,12 +219,23 @@ local function codelldb_roots()
 	local roots = vim.deepcopy(config.codelldb_candidate_roots or {})
 	local data = vim.fn.stdpath("data")
 	local home = vim.loop.os_homedir() or ""
+	local app_data = vim.env.APPDATA or ""
+	local local_app_data = vim.env.LOCALAPPDATA or ""
 
 	roots[#roots + 1] = data .. "/mason/packages/codelldb"
 	roots[#roots + 1] = data .. "/mason/packages/codelldb/extension"
-	roots[#roots + 1] = home .. "/.local/share/nvim/mason/packages/codelldb"
-	roots[#roots + 1] = home .. "/.vscode/extensions"
-	roots[#roots + 1] = home .. "/.vscode-insiders/extensions"
+	if home ~= "" then
+		roots[#roots + 1] = home .. "/.local/share/nvim/mason/packages/codelldb"
+		roots[#roots + 1] = home .. "/Library/Application Support/nvim/mason/packages/codelldb"
+		roots[#roots + 1] = home .. "/.vscode/extensions"
+		roots[#roots + 1] = home .. "/.vscode-insiders/extensions"
+	end
+	if local_app_data ~= "" then
+		roots[#roots + 1] = local_app_data .. "/nvim-data/mason/packages/codelldb"
+	end
+	if app_data ~= "" then
+		roots[#roots + 1] = app_data .. "/Code/User/globalStorage/vadimcn.vscode-lldb"
+	end
 
 	return roots
 end
