@@ -17,6 +17,7 @@ require("roundtable").setup({
   binary = "roundtable",
   config_dir = nil,
   config_name = "roundtable.nvim.toml",
+  codelldb_candidate_roots = {},
   terminal = "split",
   watches = {},
   use_dap_config = true,
@@ -24,6 +25,20 @@ require("roundtable").setup({
   profile_name = "nvim",
 })
 ```
+
+With `lazy.nvim`, make `nvim-dap` an optional dependency if you want Roundtable to reuse DAP launch configs and breakpoints:
+
+```lua
+{
+  "Saladin1812/roundtable.nvim",
+  dependencies = {
+    "mfussenegger/nvim-dap",
+  },
+  config = true,
+}
+```
+
+The plugin still works without `nvim-dap` when you pass a program explicitly.
 
 ## Usage
 
@@ -39,6 +54,12 @@ Generate and inspect TOML without launching Roundtable:
 
 ```vim
 :RoundtableGenerateConfig ./build/my_program
+```
+
+Check local setup:
+
+```vim
+:RoundtableCheck
 ```
 
 If `nvim-dap` is installed, buffer breakpoints are copied into the generated Roundtable config.
@@ -63,6 +84,16 @@ By default generated TOML is written under Neovim's cache directory. Use `config
 require("roundtable").setup({
   config_dir = vim.fn.getcwd() .. "/.roundtable",
   config_name = "from-nvim.toml",
+})
+```
+
+Roundtable auto-detects CodeLLDB from common locations, including Mason, VS Code extensions, and `PATH`. Add extra roots if your adapter is somewhere custom:
+
+```lua
+require("roundtable").setup({
+  codelldb_candidate_roots = {
+    vim.fn.expand("~/.local/share/nvim/mason/packages/codelldb"),
+  },
 })
 ```
 

@@ -74,6 +74,7 @@ local function test_profile_generation()
 	roundtable.setup({
 		config_dir = config_dir,
 		config_name = "profile.toml",
+		codelldb_candidate_roots = { project .. "/tools/codelldb" },
 		use_profile = true,
 		profile_name = "nvim",
 		working_directory = project,
@@ -93,6 +94,7 @@ local function test_profile_generation()
 	assert_contains(toml, "stop_on_entry = false")
 	assert_contains(toml, 'watches = ["argc"]')
 	assert_contains(toml, 'breakpoints = ["' .. project .. '/src/main.cpp:7", "' .. project .. '/src/main.cpp:11"]')
+	assert_contains(toml, 'candidate_roots = ["' .. project .. '/tools/codelldb"]')
 end
 
 local function test_direct_generation()
@@ -121,7 +123,27 @@ local function test_direct_generation()
 	assert_contains(toml, 'entries = ["' .. project .. '/src/main.cpp:7", "' .. project .. '/src/main.cpp:11"]')
 end
 
+local function test_check_returns_dependency_status()
+	local project = prepare_project("check")
+	install_fake_dap()
+
+	local roundtable = require("roundtable")
+	roundtable.setup({
+		binary = vim.v.progpath,
+		codelldb_candidate_roots = { project },
+		working_directory = project,
+	})
+
+	local checks = roundtable.check()
+	assert(type(checks) == "table", "expected dependency checks")
+	assert(#checks == 3, "expected three dependency checks")
+	assert(checks[1].name == "roundtable binary", "expected binary check")
+	assert(checks[2].name == "nvim-dap", "expected nvim-dap check")
+	assert(checks[3].name == "CodeLLDB", "expected CodeLLDB check")
+end
+
 test_profile_generation()
 test_direct_generation()
+test_check_returns_dependency_status()
 
 vim.print("roundtable.nvim smoke tests passed")

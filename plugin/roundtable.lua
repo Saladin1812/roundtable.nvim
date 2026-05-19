@@ -22,3 +22,9 @@ end, {
 	complete = "file",
 	desc = "Generate Roundtable TOML config without launching",
 })
+
+vim.api.nvim_create_user_command("RoundtableCheck", function()
+	require("roundtable").check()
+end, {
+	desc = "Check Roundtable, nvim-dap, and CodeLLDB setup",
+})

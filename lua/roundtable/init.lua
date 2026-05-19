@@ -4,6 +4,7 @@ local defaults = {
 	binary = "roundtable",
 	config_dir = nil,
 	config_name = "roundtable.nvim.toml",
+	codelldb_candidate_roots = {},
 	terminal = "split",
 	program = nil,
 	args = {},
@@ -22,6 +23,20 @@ local root_markers = { ".git", "CMakeLists.txt", "compile_commands.json" }
 
 local function shell_quote(value)
 	return vim.fn.shellescape(value)
+end
+
+local function path_exists(path)
+	return type(path) == "string" and path ~= "" and vim.loop.fs_stat(path) ~= nil
+end
+
+local function command_available(command)
+	if type(command) ~= "string" or command == "" then
+		return false
+	end
+	if command:find("/", 1, true) or command:find("\\", 1, true) then
+		return path_exists(command)
+	end
+	return vim.fn.executable(command) == 1
 end
 
 local function toml_string(value)
@@ -158,6 +173,81 @@ local function current_dap_configuration()
 	return nil
 end
 
+local function dap_status()
+	if not config.use_dap_config then
+		return {
+			ok = true,
+			message = "nvim-dap config lookup disabled",
+		}
+	end
+
+	local ok, dap = pcall(require, "dap")
+	if not ok or type(dap.configurations) ~= "table" then
+		return {
+			ok = false,
+			message = "nvim-dap is not available; install mfussenegger/nvim-dap or pass a program explicitly",
+		}
+	end
+
+	local filetype = vim.bo.filetype
+	local configurations = dap.configurations[filetype]
+	if type(configurations) ~= "table" or #configurations == 0 then
+		return {
+			ok = false,
+			message = "no nvim-dap launch configuration for filetype '" .. filetype .. "'",
+		}
+	end
+
+	if current_dap_configuration() then
+		return {
+			ok = true,
+			message = "nvim-dap launch configuration found",
+		}
+	end
+
+	return {
+		ok = false,
+		message = "no matching nvim-dap launch configuration with request='launch' and program",
+	}
+end
+
+local function codelldb_roots()
+	local roots = vim.deepcopy(config.codelldb_candidate_roots or {})
+	local data = vim.fn.stdpath("data")
+	local home = vim.loop.os_homedir() or ""
+
+	roots[#roots + 1] = data .. "/mason/packages/codelldb"
+	roots[#roots + 1] = data .. "/mason/packages/codelldb/extension"
+	roots[#roots + 1] = home .. "/.local/share/nvim/mason/packages/codelldb"
+	roots[#roots + 1] = home .. "/.vscode/extensions"
+	roots[#roots + 1] = home .. "/.vscode-insiders/extensions"
+
+	return roots
+end
+
+local function codelldb_status()
+	if command_available("codelldb") then
+		return {
+			ok = true,
+			message = "codelldb found on PATH",
+		}
+	end
+
+	for _, root in ipairs(codelldb_roots()) do
+		if path_exists(root) then
+			return {
+				ok = true,
+				message = "CodeLLDB candidate root found: " .. root,
+			}
+		end
+	end
+
+	return {
+		ok = false,
+		message = "CodeLLDB was not found on PATH, Mason, or common VS Code extension roots",
+	}
+end
+
 local function build_launch_context(program)
 	local dap_configuration = nil
 	if not program or program == "" then
@@ -245,7 +335,7 @@ local function write_config(launch_context)
 			"",
 			"[codelldb.auto_detect]",
 			"enabled = true",
-			"candidate_roots = []",
+			"candidate_roots = " .. toml_array(config.codelldb_candidate_roots),
 			"",
 		}
 	else
@@ -269,7 +359,7 @@ local function write_config(launch_context)
 			"",
 			"[codelldb.auto_detect]",
 			"enabled = true",
-			"candidate_roots = []",
+			"candidate_roots = " .. toml_array(config.codelldb_candidate_roots),
 			"",
 		}
 	end
@@ -325,6 +415,38 @@ function M.setup(opts)
 	config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
 end
 
+function M.check()
+	local binary_found = command_available(config.binary)
+	local dap = dap_status()
+	local code_lldb = codelldb_status()
+
+	local checks = {
+		{
+			name = "roundtable binary",
+			ok = binary_found,
+			message = binary_found and ("found: " .. config.binary)
+				or ("not found: " .. config.binary .. "; set setup({ binary = '/path/to/roundtable' })"),
+		},
+		{
+			name = "nvim-dap",
+			ok = dap.ok,
+			message = dap.message,
+		},
+		{
+			name = "CodeLLDB",
+			ok = code_lldb.ok,
+			message = code_lldb.message,
+		},
+	}
+
+	for _, check in ipairs(checks) do
+		local level = check.ok and vim.log.levels.INFO or vim.log.levels.WARN
+		vim.notify("Roundtable check: " .. check.name .. ": " .. check.message, level)
+	end
+
+	return checks
+end
+
 function M.generate_config(program)
 	local launch_context = resolve_launch_context(program)
 	if not launch_context then
@@ -335,6 +457,22 @@ function M.generate_config(program)
 end
 
 function M.launch(program)
+	if not command_available(config.binary) then
+		vim.notify(
+			"Roundtable binary not found: " .. config.binary .. ". Set setup({ binary = '/path/to/roundtable' }).",
+			vim.log.levels.ERROR
+		)
+		return
+	end
+
+	local code_lldb = codelldb_status()
+	if not code_lldb.ok then
+		vim.notify(
+			"CodeLLDB was not detected. Roundtable may fail to start; install CodeLLDB with Mason/VS Code or set codelldb_candidate_roots.",
+			vim.log.levels.WARN
+		)
+	end
+
 	local generated_config = M.generate_config(program)
 	if not generated_config then
 		return
