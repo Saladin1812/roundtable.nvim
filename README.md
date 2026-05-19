@@ -31,6 +31,12 @@ Launch with an explicit program:
 
 Or call `:RoundtableLaunch` with no argument and enter the program path when prompted.
 
+Generate and inspect TOML without launching Roundtable:
+
+```vim
+:RoundtableGenerateConfig ./build/my_program
+```
+
 If `nvim-dap` is installed, buffer breakpoints are copied into the generated Roundtable config.
 
 When called without an explicit program, the plugin first tries the current filetype's `nvim-dap` launch configuration:

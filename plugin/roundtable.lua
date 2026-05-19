@@ -1,13 +1,24 @@
 if vim.g.loaded_roundtable_nvim == 1 then
-  return
+	return
 end
 
 vim.g.loaded_roundtable_nvim = 1
 
 vim.api.nvim_create_user_command("RoundtableLaunch", function(opts)
-  require("roundtable").launch(opts.args ~= "" and opts.args or nil)
+	require("roundtable").launch(opts.args ~= "" and opts.args or nil)
 end, {
-  nargs = "?",
-  complete = "file",
-  desc = "Launch Roundtable with a generated TOML config",
+	nargs = "?",
+	complete = "file",
+	desc = "Launch Roundtable with a generated TOML config",
+})
+
+vim.api.nvim_create_user_command("RoundtableGenerateConfig", function(opts)
+	local path = require("roundtable").generate_config(opts.args ~= "" and opts.args or nil)
+	if path then
+		vim.notify("Roundtable config generated: " .. path, vim.log.levels.INFO)
+	end
+end, {
+	nargs = "?",
+	complete = "file",
+	desc = "Generate Roundtable TOML config without launching",
 })
