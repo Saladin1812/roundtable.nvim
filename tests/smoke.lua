@@ -70,7 +70,10 @@ local function test_profile_generation()
 	install_fake_dap()
 
 	local roundtable = require("roundtable")
+	local config_dir = project .. "/.roundtable"
 	roundtable.setup({
+		config_dir = config_dir,
+		config_name = "profile.toml",
 		use_profile = true,
 		profile_name = "nvim",
 		working_directory = project,
@@ -79,6 +82,7 @@ local function test_profile_generation()
 
 	local config_path = roundtable.generate_config()
 	assert(config_path, "expected profile config path")
+	assert(config_path == config_dir .. "/profile.toml", "unexpected profile config path: " .. config_path)
 	local toml = read_file(config_path)
 
 	assert_contains(toml, 'profile = "nvim"')
@@ -96,7 +100,10 @@ local function test_direct_generation()
 	install_fake_dap()
 
 	local roundtable = require("roundtable")
+	local config_dir = project .. "/.roundtable"
 	roundtable.setup({
+		config_dir = config_dir,
+		config_name = "direct.toml",
 		use_profile = false,
 		working_directory = project,
 		watches = { "argc" },
@@ -104,6 +111,7 @@ local function test_direct_generation()
 
 	local config_path = roundtable.generate_config()
 	assert(config_path, "expected direct config path")
+	assert(config_path == config_dir .. "/direct.toml", "unexpected direct config path: " .. config_path)
 	local toml = read_file(config_path)
 
 	assert_contains(toml, 'mode = "dap_launch"')

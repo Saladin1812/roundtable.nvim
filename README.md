@@ -15,6 +15,8 @@ It does not share or attach to an existing `nvim-dap` session. Roundtable starts
 ```lua
 require("roundtable").setup({
   binary = "roundtable",
+  config_dir = nil,
+  config_name = "roundtable.nvim.toml",
   terminal = "split",
   watches = {},
   use_dap_config = true,
@@ -54,6 +56,15 @@ breakpoints = []
 ```
 
 Set `use_profile = false` if you want direct `[dap_launch]`, `[watches]`, and `[breakpoints]` sections instead.
+
+By default generated TOML is written under Neovim's cache directory. Use `config_dir` and `config_name` if you want a stable location:
+
+```lua
+require("roundtable").setup({
+  config_dir = vim.fn.getcwd() .. "/.roundtable",
+  config_name = "from-nvim.toml",
+})
+```
 
 When called without an explicit program, the plugin first tries the current filetype's `nvim-dap` launch configuration:
 

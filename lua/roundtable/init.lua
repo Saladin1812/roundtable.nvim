@@ -2,6 +2,7 @@ local M = {}
 
 local defaults = {
 	binary = "roundtable",
+	config_dir = nil,
 	config_name = "roundtable.nvim.toml",
 	terminal = "split",
 	program = nil,
@@ -220,7 +221,7 @@ local function collect_breakpoints()
 end
 
 local function write_config(launch_context)
-	local temp_dir = vim.fn.stdpath("cache") .. "/roundtable"
+	local temp_dir = config.config_dir or (vim.fn.stdpath("cache") .. "/roundtable")
 	vim.fn.mkdir(temp_dir, "p")
 
 	local config_path = temp_dir .. "/" .. config.config_name
