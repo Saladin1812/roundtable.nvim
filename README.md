@@ -62,6 +62,18 @@ Check local setup:
 :RoundtableCheck
 ```
 
+Open the last generated TOML, or generate one first if needed:
+
+```vim
+:RoundtableOpenConfig
+```
+
+Show resolved plugin state:
+
+```vim
+:RoundtableInfo
+```
+
 If `nvim-dap` is installed, buffer breakpoints are copied into the generated Roundtable config.
 
 By default the generated TOML uses a Roundtable launch profile:

@@ -19,6 +19,10 @@ local defaults = {
 }
 
 local config = vim.deepcopy(defaults)
+local state = {
+	last_config_path = nil,
+	last_launch_context = nil,
+}
 local root_markers = { ".git", "CMakeLists.txt", "compile_commands.json" }
 
 local function shell_quote(value)
@@ -415,6 +419,10 @@ function M.setup(opts)
 	config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
 end
 
+function M.last_config_path()
+	return state.last_config_path
+end
+
 function M.check()
 	local binary_found = command_available(config.binary)
 	local dap = dap_status()
@@ -447,13 +455,52 @@ function M.check()
 	return checks
 end
 
+function M.info()
+	local dap = dap_status()
+	local code_lldb = codelldb_status()
+	local lines = {
+		"Roundtable binary: " .. config.binary,
+		"Last config: " .. (state.last_config_path or "none"),
+		"Terminal: " .. config.terminal,
+		"Profile mode: " .. tostring(config.use_profile),
+		"Profile name: " .. config.profile_name,
+		"DAP config: " .. dap.message,
+		"CodeLLDB: " .. code_lldb.message,
+	}
+
+	if state.last_launch_context then
+		lines[#lines + 1] = "Program: " .. state.last_launch_context.program
+		lines[#lines + 1] = "Working directory: " .. state.last_launch_context.working_directory
+	end
+
+	vim.notify(table.concat(lines, "\n"), vim.log.levels.INFO)
+	return lines
+end
+
 function M.generate_config(program)
 	local launch_context = resolve_launch_context(program)
 	if not launch_context then
 		return nil
 	end
 
-	return write_config(launch_context)
+	local config_path = write_config(launch_context)
+	state.last_config_path = config_path
+	state.last_launch_context = launch_context
+	return config_path
+end
+
+function M.open_config(program)
+	local config_path = state.last_config_path
+	if not config_path or not path_exists(config_path) then
+		config_path = M.generate_config(program)
+	end
+
+	if not config_path then
+		return nil
+	end
+
+	vim.cmd.edit(vim.fn.fnameescape(config_path))
+	return config_path
 end
 
 function M.launch(program)

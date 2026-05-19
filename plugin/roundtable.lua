@@ -28,3 +28,17 @@ vim.api.nvim_create_user_command("RoundtableCheck", function()
 end, {
 	desc = "Check Roundtable, nvim-dap, and CodeLLDB setup",
 })
+
+vim.api.nvim_create_user_command("RoundtableOpenConfig", function(opts)
+	require("roundtable").open_config(opts.args ~= "" and opts.args or nil)
+end, {
+	nargs = "?",
+	complete = "file",
+	desc = "Open the last generated Roundtable TOML config",
+})
+
+vim.api.nvim_create_user_command("RoundtableInfo", function()
+	require("roundtable").info()
+end, {
+	desc = "Show resolved Roundtable plugin state",
+})

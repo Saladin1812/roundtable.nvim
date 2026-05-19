@@ -84,6 +84,7 @@ local function test_profile_generation()
 	local config_path = roundtable.generate_config()
 	assert(config_path, "expected profile config path")
 	assert(config_path == config_dir .. "/profile.toml", "unexpected profile config path: " .. config_path)
+	assert(roundtable.last_config_path() == config_path, "expected last config path to be tracked")
 	local toml = read_file(config_path)
 
 	assert_contains(toml, 'profile = "nvim"')
@@ -140,10 +141,33 @@ local function test_check_returns_dependency_status()
 	assert(checks[1].name == "roundtable binary", "expected binary check")
 	assert(checks[2].name == "nvim-dap", "expected nvim-dap check")
 	assert(checks[3].name == "CodeLLDB", "expected CodeLLDB check")
+
+	local info = roundtable.info()
+	assert(type(info) == "table", "expected info lines")
+	assert(#info >= 7, "expected resolved plugin info")
+end
+
+local function test_open_config_opens_last_generated_config()
+	local project = prepare_project("open-config")
+	install_fake_dap()
+
+	local roundtable = require("roundtable")
+	local config_dir = project .. "/.roundtable"
+	roundtable.setup({
+		config_dir = config_dir,
+		config_name = "open.toml",
+		working_directory = project,
+	})
+
+	local generated_path = roundtable.generate_config()
+	local opened_path = roundtable.open_config()
+	assert(opened_path == generated_path, "expected open_config to reuse last generated path")
+	assert(vim.api.nvim_buf_get_name(0) == generated_path, "expected current buffer to be generated config")
 end
 
 test_profile_generation()
 test_direct_generation()
 test_check_returns_dependency_status()
+test_open_config_opens_last_generated_config()
 
 vim.print("roundtable.nvim smoke tests passed")
