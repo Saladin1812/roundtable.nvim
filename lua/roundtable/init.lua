@@ -5,7 +5,7 @@ local defaults = {
 	config_dir = nil,
 	config_name = "roundtable.nvim.toml",
 	codelldb_candidate_roots = {},
-	terminal = "split",
+	terminal = "tab",
 	program = nil,
 	args = {},
 	watches = {},
@@ -302,24 +302,39 @@ local function collect_breakpoints()
 		return {}
 	end
 
-	local entries = {}
-	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+	local function add_buffer_breakpoints(entries, bufnr, buffer_breakpoints)
+		if type(buffer_breakpoints) ~= "table" then
+			return
+		end
+
 		local source_path = normalize_path(vim.api.nvim_buf_get_name(bufnr))
 		if source_path then
-			local buffer_breakpoints = dap_breakpoints.get(bufnr)
-			if type(buffer_breakpoints) == "table" then
-				for _, breakpoint in ipairs(buffer_breakpoints) do
-					if
-						type(breakpoint) == "table"
-						and breakpoint.enabled ~= false
-						and type(breakpoint.line) == "number"
-						and breakpoint.line > 0
-					then
-						entries[#entries + 1] = source_path .. ":" .. tostring(breakpoint.line)
-					end
+			for _, breakpoint in pairs(buffer_breakpoints) do
+				if
+					type(breakpoint) == "table"
+					and breakpoint.enabled ~= false
+					and type(breakpoint.line) == "number"
+					and breakpoint.line > 0
+				then
+					entries[#entries + 1] = source_path .. ":" .. tostring(breakpoint.line)
 				end
 			end
 		end
+	end
+
+	local entries = {}
+	local grouped_breakpoints = dap_breakpoints.get()
+	if type(grouped_breakpoints) == "table" and next(grouped_breakpoints) ~= nil then
+		for bufnr, buffer_breakpoints in pairs(grouped_breakpoints) do
+			if type(bufnr) == "number" then
+				add_buffer_breakpoints(entries, bufnr, buffer_breakpoints)
+			end
+		end
+		return entries
+	end
+
+	for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+		add_buffer_breakpoints(entries, bufnr, dap_breakpoints.get(bufnr))
 	end
 
 	return entries
@@ -331,6 +346,14 @@ local function write_config(launch_context)
 
 	local config_path = temp_dir .. "/" .. config.config_name
 	local breakpoints = collect_breakpoints()
+	local stop_on_entry = launch_context.stop_on_entry
+	if stop_on_entry == false and #breakpoints == 0 then
+		stop_on_entry = true
+		vim.notify(
+			"Roundtable: no nvim-dap breakpoints found; forcing stop_on_entry=true to avoid launching without a stop point",
+			vim.log.levels.WARN
+		)
+	end
 
 	local lines
 	if config.use_profile then
@@ -343,7 +366,7 @@ local function write_config(launch_context)
 			"program = " .. toml_string(launch_context.program),
 			"arguments = " .. toml_array(launch_context.args),
 			"working_directory = " .. toml_string(launch_context.working_directory),
-			"stop_on_entry = " .. tostring(launch_context.stop_on_entry),
+			"stop_on_entry = " .. tostring(stop_on_entry),
 			"continue_once = " .. tostring(config.continue_once),
 			"watches = " .. toml_array(config.watches),
 			"breakpoints = " .. toml_array(breakpoints),
@@ -363,7 +386,7 @@ local function write_config(launch_context)
 			"program = " .. toml_string(launch_context.program),
 			"arguments = " .. toml_array(launch_context.args),
 			"working_directory = " .. toml_string(launch_context.working_directory),
-			"stop_on_entry = " .. tostring(launch_context.stop_on_entry),
+			"stop_on_entry = " .. tostring(stop_on_entry),
 			"continue_once = " .. tostring(config.continue_once),
 			"",
 			"[watches]",

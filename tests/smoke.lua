@@ -65,6 +65,23 @@ local function install_fake_dap()
 	end
 end
 
+local function install_fake_dap_with_grouped_breakpoints()
+	install_fake_dap()
+	package.loaded["dap.breakpoints"] = nil
+	package.preload["dap.breakpoints"] = function()
+		return {
+			get = function(bufnr)
+				if bufnr ~= nil then
+					return {}
+				end
+				return {
+					[vim.api.nvim_get_current_buf()] = current_buffer_breakpoints(),
+				}
+			end,
+		}
+	end
+end
+
 local function test_profile_generation()
 	local project = prepare_project("profile")
 	install_fake_dap()
@@ -96,6 +113,28 @@ local function test_profile_generation()
 	assert_contains(toml, 'watches = ["argc"]')
 	assert_contains(toml, 'breakpoints = ["' .. project .. '/src/main.cpp:7", "' .. project .. '/src/main.cpp:11"]')
 	assert_contains(toml, 'candidate_roots = ["' .. project .. '/tools/codelldb"]')
+end
+
+local function test_profile_generation_reads_grouped_nvim_dap_breakpoints()
+	local project = prepare_project("grouped-breakpoints")
+	install_fake_dap_with_grouped_breakpoints()
+
+	local roundtable = require("roundtable")
+	local config_dir = project .. "/.roundtable"
+	roundtable.setup({
+		config_dir = config_dir,
+		config_name = "grouped.toml",
+		use_profile = true,
+		profile_name = "nvim",
+		working_directory = project,
+	})
+
+	local config_path = roundtable.generate_config()
+	assert(config_path, "expected grouped breakpoint config path")
+	local toml = read_file(config_path)
+
+	assert_contains(toml, 'breakpoints = ["' .. project .. '/src/main.cpp:7", "' .. project .. '/src/main.cpp:11"]')
+	assert_contains(toml, "stop_on_entry = false")
 end
 
 local function test_direct_generation()
@@ -166,6 +205,7 @@ local function test_open_config_opens_last_generated_config()
 end
 
 test_profile_generation()
+test_profile_generation_reads_grouped_nvim_dap_breakpoints()
 test_direct_generation()
 test_check_returns_dependency_status()
 test_open_config_opens_last_generated_config()

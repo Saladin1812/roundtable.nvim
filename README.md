@@ -18,7 +18,7 @@ require("roundtable").setup({
   config_dir = nil,
   config_name = "roundtable.nvim.toml",
   codelldb_candidate_roots = {},
-  terminal = "split",
+  terminal = "tab",
   watches = {},
   use_dap_config = true,
   use_profile = true,
@@ -39,6 +39,23 @@ With `lazy.nvim`, make `nvim-dap` an optional dependency if you want Roundtable 
 ```
 
 The plugin still works without `nvim-dap` when you pass a program explicitly.
+
+## Terminal Mode
+
+Roundtable is a full terminal UI, so the default launch target is a Neovim tab:
+
+```lua
+require("roundtable").setup({
+  terminal = "tab",
+})
+```
+
+Supported values:
+
+- `tab`: open Roundtable in a new Neovim tab. Best default for full-width debugging.
+- `split`: open Roundtable in a horizontal split.
+- `vsplit`: open Roundtable in a vertical split.
+- `current`: reuse the current window.
 
 ## Usage
 
